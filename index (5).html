@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tablero del Abismo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg-deep: #05070d;
+    --bg-panel: #0b0f1a;
+    --grid-line: #1b2333;
+    --ink: #cdd7e8;
+    --ink-dim: #7c8aa3;
+    --amber: #ffc23c;
+
+    /* theme-controlled (overridden by JS) */
+    --sq-light: #111a2c;
+    --sq-dark: #0b1220;
+    --board-border: #1b2333;
+    --piece-white: #35fff0;
+    --piece-black: #ff3ec8;
+    --white-shadow: 0 0 6px rgba(53,255,240,0.9), 0 0 16px rgba(53,255,240,0.5);
+    --black-shadow: 0 0 6px rgba(255,62,200,0.9), 0 0 16px rgba(255,62,200,0.5);
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  .icon-btn, .theme-swatch, .side-swatch, .square, button.action, details.rules summary{
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  html{ -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+
+  body{
+    margin:0;
+    min-height: 100vh;
+    min-height: 100svh;
+    overscroll-behavior: none;
+    background:
+      radial-gradient(circle at 50% 0%, #0c1224 0%, var(--bg-deep) 55%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+    color: var(--ink);
+    font-family: 'Rajdhani', sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: clamp(16px, 4vw, 40px) max(16px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  header{ text-align:center; margin-bottom: clamp(14px, 3vw, 22px); }
+
+  h1{
+    font-family:'Orbitron', sans-serif;
+    font-weight:800;
+    font-size: clamp(1.7rem, 5vw, 2.6rem);
+    margin: 0;
+    letter-spacing: 0.04em;
+    color:#eef4ff;
+    text-shadow: 0 0 12px rgba(53,255,240,0.3), 0 0 28px rgba(255,62,200,0.16);
+  }
+
+  header p{
+    margin: 6px 0 0;
+    color: var(--ink-dim);
+    font-size: clamp(0.85rem, 2.2vw, 1rem);
+    font-weight:600;
+  }
+
+  .layout{
+    width:100%;
+    max-width: 520px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 14px;
+  }
+
+  /* ---------- settings panel ---------- */
+  .settings{
+    width:100%;
+    display:flex;
+    flex-wrap: wrap;
+    align-items:flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--grid-line);
+    background: rgba(255,255,255,0.02);
+  }
+  .settings-icons{
+    display:flex;
+    flex-wrap: wrap;
+    align-items:flex-start;
+    justify-content:center;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .field{ display:flex; flex-direction:column; gap:4px; flex: 1 1 150px; min-width: 130px; }
+  .field-compact{ flex: 0 0 108px; min-width: 0; }
+  .field-compact select{ padding: 10px 4px; }
+  .field label{
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    font-weight:700;
+  }
+  .field select{
+    font-family:'Rajdhani', sans-serif;
+    font-weight:600;
+    font-size:1rem;
+    padding: 10px 12px;
+    min-height: 44px;
+    border-radius: 7px;
+    border: 1px solid var(--grid-line);
+    background: var(--bg-panel);
+    color: var(--ink);
+    touch-action: manipulation;
+  }
+  .field.hidden, .icon-field.hidden{ display:none; }
+
+  .icon-field{ display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+  .icon-field-label{
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    font-weight:700;
+  }
+  .icon-group{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+
+  .icon-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:44px;
+    height:44px;
+    flex-shrink:0;
+    padding:0;
+    border-radius:8px;
+    border: 1px solid var(--grid-line);
+    background: rgba(255,255,255,0.03);
+    color: var(--ink-dim);
+    cursor:pointer;
+    touch-action: manipulation;
+    transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .icon-btn svg{ width:20px; height:20px; }
+  .icon-btn.piece-btn{ font-size: 22px; line-height: 1; font-family: inherit; }
+  .icon-btn:active{ border-color: var(--piece-white); color:#eef4ff; }
+  .icon-btn.active{
+    border-color: var(--piece-white);
+    color: #eef4ff;
+    background: color-mix(in srgb, var(--piece-white) 18%, transparent);
+    box-shadow: 0 0 12px -2px color-mix(in srgb, var(--piece-white) 55%, transparent);
+  }
+  #helpToggleBtn.active{
+    border-color: var(--amber);
+    color: var(--amber);
+    background: rgba(255,194,60,0.14);
+    box-shadow: 0 0 12px -2px rgba(255,194,60,0.6);
+  }
+  #captureToggleBtn.active{
+    border-color: #ff5a5a;
+    color: #ff5a5a;
+    background: rgba(255,90,90,0.14);
+    box-shadow: 0 0 12px -2px rgba(255,90,90,0.6);
+  }
+  .icon-btn:disabled{
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .theme-swatch{
+    width:44px;
+    height:44px;
+    flex-shrink:0;
+    padding:0;
+    border-radius:50%;
+    border: 2px solid var(--grid-line);
+    cursor:pointer;
+    touch-action: manipulation;
+    background: conic-gradient(var(--sw-a) 0deg 180deg, var(--sw-b) 180deg 360deg);
+    transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  }
+  .theme-swatch.active{
+    border-color: #eef4ff;
+    box-shadow: 0 0 10px -1px rgba(255,255,255,0.5);
+  }
+  .theme-swatch:active{ transform: scale(1.06); }
+
+  .side-swatch{
+    width:44px;
+    height:44px;
+    flex-shrink:0;
+    padding:0;
+    border-radius:50%;
+    border: 2px solid var(--grid-line);
+    cursor:pointer;
+    touch-action: manipulation;
+    opacity: 0.5;
+    transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  }
+  .side-swatch[data-side="white"]{ background: var(--piece-white); }
+  .side-swatch[data-side="black"]{ background: var(--piece-black); }
+  .side-swatch.active{
+    opacity: 1;
+    border-color: #eef4ff;
+    transform: scale(1.06);
+    box-shadow: 0 0 10px -1px rgba(255,255,255,0.5);
+  }
+  .side-swatch:active{ opacity: 0.8; }
+
+  /* ---------- status bar ---------- */
+  .status-bar{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 10px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+    border: 1px solid var(--grid-line);
+    font-weight:700;
+    font-size: clamp(0.95rem, 3vw, 1.15rem);
+    letter-spacing: 0.03em;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    min-height: 26px;
+  }
+  .status-bar.turn-white{ border-color: color-mix(in srgb, var(--piece-white) 40%, var(--grid-line)); box-shadow: 0 0 18px -4px color-mix(in srgb, var(--piece-white) 55%, transparent) inset; }
+  .status-bar.turn-black{ border-color: color-mix(in srgb, var(--piece-black) 40%, var(--grid-line)); box-shadow: 0 0 18px -4px color-mix(in srgb, var(--piece-black) 55%, transparent) inset; }
+  .status-bar.game-over{ border-color: var(--amber); }
+  .status-bar.thinking{ opacity:0.85; }
+
+  .status-dot{ width: 12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .turn-white .status-dot{ background: var(--piece-white); box-shadow: 0 0 10px 2px color-mix(in srgb, var(--piece-white) 80%, transparent); }
+  .turn-black .status-dot{ background: var(--piece-black); box-shadow: 0 0 10px 2px color-mix(in srgb, var(--piece-black) 80%, transparent); }
+  .game-over .status-dot{ background: var(--amber); box-shadow: 0 0 10px 2px rgba(255,194,60,0.8); }
+
+  /* ---------- board ---------- */
+  .board-frame{
+    position:relative;
+    width:100%;
+    max-width: 520px;
+    padding: clamp(8px, 2vw, 14px);
+    background: var(--bg-panel);
+    border: 1px solid var(--grid-line);
+    border-radius: 14px;
+    box-shadow: 0 0 40px -18px color-mix(in srgb, var(--piece-white) 45%, transparent);
+    transition: box-shadow 0.3s ease;
+  }
+  .board-frame.thinking{ opacity: 0.92; }
+
+  .theme-panel{
+    display:flex;
+    flex-direction:row;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    justify-content:center;
+    gap: 28px;
+  }
+  .theme-panel .icon-field{ align-items:center; }
+  #vsaiPanel.hidden{ display:none; }
+
+  /* ---------- online panel ---------- */
+  #onlinePanel{
+    width:100%;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--grid-line);
+    background: rgba(255,255,255,0.02);
+    text-align:center;
+  }
+  #onlinePanel.hidden{ display:none; }
+  .online-view{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:10px; }
+  .online-view.hidden{ display:none; }
+  .online-join{ display:flex; gap:6px; }
+  .online-join input{
+    font-family:'Orbitron', sans-serif; font-weight:600; font-size:1rem;
+    width: 7.5em; text-align:center; text-transform:uppercase; letter-spacing:0.15em;
+    min-height:44px; padding: 8px 10px; border-radius:8px;
+    border:1px solid var(--grid-line); background: var(--bg-panel); color: var(--ink);
+  }
+  .online-code{
+    font-family:'Orbitron', sans-serif; font-weight:800; font-size:1.8rem;
+    letter-spacing:0.25em; color: var(--piece-white);
+    text-shadow: 0 0 10px color-mix(in srgb, var(--piece-white) 60%, transparent);
+  }
+  .online-msg{ font-size:0.95rem; color: var(--ink-dim); width:100%; }
+  .online-msg.error{ color: var(--amber); }
+  .theme-panel .icon-group{ justify-content:center; }
+
+  .board-inner{ display:flex; gap: 6px; }
+
+  .ranks{ display:grid; grid-template-rows: repeat(8, 1fr); align-items:center; padding-bottom: 22px; }
+  .ranks span{ font-size: 0.7rem; color: var(--ink-dim); width: 16px; text-align:center; font-weight:600; }
+
+  .board-col{ flex:1; display:flex; flex-direction:column; gap:6px; }
+
+  .board{
+    display:grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    aspect-ratio: 1 / 1;
+    border-radius: 4px;
+    overflow:hidden;
+    border: 1px solid var(--board-border);
+  }
+  .board.thinking{ pointer-events:none; }
+  .board:focus{ outline: none; }
+  .board:focus-visible{ box-shadow: 0 0 0 2px var(--piece-white); }
+
+  .files{ display:grid; grid-template-columns: repeat(8, 1fr); padding-top: 2px; }
+  .files span{ text-align:center; font-size:0.7rem; color: var(--ink-dim); font-weight:600; }
+
+  .square{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background-color: var(--sq-dark);
+    cursor:pointer;
+    touch-action: manipulation;
+    transition: background-color 0.15s ease;
+  }
+  .square.light{ background-color: var(--sq-light); }
+  .square.selected{ box-shadow: inset 0 0 0 2px rgba(255,255,255,0.55); }
+  .square:active{ filter: brightness(1.2); }
+  .square.reject{ animation: reject-flash 0.4s ease; }
+  @keyframes reject-flash{ 0% { filter: brightness(2.2) saturate(0.4); } 100% { filter: none; } }
+  .square.reject-shake{ animation: shake 0.35s ease; }
+  @keyframes shake{ 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+  .square.legal-move{ cursor:pointer; }
+  .legal-dot{
+    position:absolute;
+    width:26%;
+    height:26%;
+    border-radius:50%;
+    pointer-events:none;
+    transition: transform 0.12s ease;
+  }
+  .square.legal-move.mover-white .legal-dot{
+    background: var(--piece-white);
+    box-shadow: 0 0 8px 2px color-mix(in srgb, var(--piece-white) 55%, transparent);
+  }
+  .square.legal-move.mover-black .legal-dot{
+    background: var(--piece-black);
+    box-shadow: 0 0 8px 2px color-mix(in srgb, var(--piece-black) 55%, transparent);
+  }
+  .square.legal-move.trap .legal-dot{
+    background: #ff5a5a;
+    box-shadow: 0 0 10px 3px rgba(255,90,90,0.65);
+  }
+  .square.legal-move:active .legal-dot{ transform: scale(1.3); }
+
+  .square.capturable{
+    box-shadow: inset 0 0 0 3px #ff3b3b, 0 0 16px 2px rgba(255,59,59,0.55);
+    animation: capturable-pulse 1s ease-in-out infinite;
+  }
+  @keyframes capturable-pulse{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(1.25); } }
+
+  .square.burnt{
+    background-color: #05070a;
+    background-image:
+      linear-gradient(135deg, transparent 47%, rgba(255,255,255,0.07) 49%, rgba(255,255,255,0.07) 51%, transparent 53%),
+      linear-gradient(45deg, transparent 47%, rgba(255,255,255,0.05) 49%, rgba(255,255,255,0.05) 51%, transparent 53%);
+    box-shadow: inset 0 0 14px 4px rgba(0,0,0,0.85);
+    cursor: default;
+  }
+  .square.burnt:active{ filter: none; }
+
+  .square.victory-square{
+    box-shadow: inset 0 0 0 3px var(--amber), 0 0 20px 4px rgba(255,194,60,0.55);
+    animation: victory-square-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes victory-square-pulse{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(1.3); } }
+
+  .square.kb-focus{
+    outline: 2px dashed var(--ink);
+    outline-offset: -2px;
+  }
+
+  .piece{ font-size: clamp(1.4rem, 6.5vw, 2.1rem); line-height:1; user-select:none; transition: transform 0.15s ease; }
+  .piece.white{ color: var(--piece-white); text-shadow: var(--white-shadow); }
+  .piece.black{ color: var(--piece-black); text-shadow: var(--black-shadow); }
+  .square.selected .piece{ transform: scale(1.12); }
+
+  .controls{ display:flex; gap:10px; margin-top: 4px; }
+
+  button.action{
+    font-family:'Rajdhani', sans-serif;
+    font-weight:700;
+    letter-spacing:0.03em;
+    font-size:1rem;
+    padding: 11px 22px;
+    min-height: 44px;
+    border-radius: 8px;
+    border: 1px solid var(--grid-line);
+    background: rgba(255,255,255,0.03);
+    color: var(--ink);
+    cursor:pointer;
+    touch-action: manipulation;
+    transition: border-color 0.2s ease, color 0.2s ease;
+  }
+  button.action:active{ border-color: var(--piece-white); color: #eef4ff; }
+
+  details.rules{
+    width:100%;
+    max-width: 520px;
+    border: 1px solid var(--grid-line);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+  }
+  details.rules summary{
+    cursor:pointer;
+    padding: 10px 14px;
+    min-height: 44px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color: var(--ink-dim);
+    list-style:none;
+    touch-action: manipulation;
+    transition: color 0.2s ease;
+  }
+  details.rules summary:active{ color: #eef4ff; }
+  details.rules summary svg{ width:22px; height:22px; }
+  details.rules summary::-webkit-details-marker{ display:none; }
+  details.rules[open] summary{ color: var(--piece-white); }
+  details.rules .rules-body{ padding: 0 16px 16px; font-size:0.92rem; line-height:1.55; color: var(--ink-dim); }
+  details.rules .rules-body strong{ color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce){
+    .square.reject, .square.reject-shake{ animation: none; }
+    .victory-beam{ animation: none; }
+    .victory-card h2{ animation: none; }
+    .square.victory-square{ animation: none; }
+    .square.capturable{ animation: none; }
+  }
+
+  /* ---------- victory overlay ---------- */
+  .victory-overlay{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 20px;
+    background: rgba(5,7,13,0.72);
+    backdrop-filter: blur(6px);
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.25s ease;
+    z-index: 50;
+  }
+  .victory-overlay.show{ opacity:1; pointer-events:auto; }
+  .victory-card{
+    position:relative;
+    width:min(380px, 100%);
+    padding: 34px 28px 28px;
+    border-radius:16px;
+    background: var(--bg-panel);
+    border:1px solid var(--grid-line);
+    text-align:center;
+    overflow:hidden;
+    transform: scale(0.85);
+    transition: transform 0.3s cubic-bezier(.2,1.4,.4,1);
+  }
+  .victory-overlay.show .victory-card{ transform: scale(1); }
+  .victory-beam{
+    position:absolute;
+    inset:-60% -80%;
+    background: conic-gradient(from 0deg,
+      transparent 0deg, var(--victory-color, #35fff0) 8deg, transparent 30deg,
+      transparent 180deg, var(--victory-color, #35fff0) 188deg, transparent 210deg,
+      transparent 360deg);
+    animation: victory-spin 3.2s linear infinite;
+    opacity:0.32;
+  }
+  @keyframes victory-spin{ to{ transform: rotate(360deg); } }
+  .victory-card h2{
+    position:relative;
+    font-family:'Orbitron', sans-serif;
+    font-weight:800;
+    font-size: clamp(1.3rem, 6vw, 1.8rem);
+    margin: 0 0 10px;
+    letter-spacing:0.03em;
+    color: var(--victory-color, #eef4ff);
+    text-shadow: 0 0 14px var(--victory-color, transparent), 0 0 30px var(--victory-color, transparent);
+    animation: victory-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes victory-pulse{ 0%,100%{ filter: brightness(1); } 50%{ filter: brightness(1.35); } }
+  .victory-card p{
+    position:relative;
+    margin:0 0 22px;
+    color: var(--ink-dim);
+    font-weight:600;
+    font-size:0.92rem;
+  }
+  .victory-card button{ position:relative; width:100%; }
+
+  /* ---------- hover (mouse/trackpad only — avoids "stuck" states on touch) ---------- */
+  @media (hover: hover) and (pointer: fine){
+    .square:hover{ filter: brightness(1.2); }
+    .square.legal-move:hover .legal-dot{ transform: scale(1.3); }
+    .icon-btn:hover{ border-color: var(--piece-white); color:#eef4ff; }
+    .theme-swatch:hover{ transform: scale(1.06); }
+    .side-swatch:hover{ opacity: 0.8; }
+    button.action:hover{ border-color: var(--piece-white); color: #eef4ff; }
+    details.rules summary:hover{ color: #eef4ff; }
+  }
+
+  /* ---------- small phones ---------- */
+  @media (max-width: 360px){
+    body{ padding-left: 10px; padding-right: 10px; }
+    .settings{ padding: 12px; gap: 10px; }
+    .settings-icons{ gap: 10px; }
+    .icon-group{ gap: 6px; }
+    .icon-btn, .theme-swatch, .side-swatch{ width: 38px; height: 38px; }
+    .icon-btn svg{ width: 18px; height: 18px; }
+    .field-compact{ flex-basis: 92px; }
+    .field-compact select{ padding: 8px 2px; }
+    .ranks span, .files span{ font-size: 0.6rem; }
+    .ranks{ padding-bottom: 18px; }
+  }
+
+  /* ---------- short / landscape viewports ---------- */
+  @media (max-height: 560px) and (orientation: landscape){
+    body{ padding-top: 10px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+    header{ margin-bottom: 8px; }
+    h1{ font-size: 1.3rem; }
+    header p{ display:none; }
+    .layout{ gap: 8px; }
+    .settings{ padding: 8px 12px; gap: 6px 12px; }
+    details.rules{ display:none; }
+    .board-frame{ max-width: 46vh; }
+  }
+
+  /* ---------- tablet and up ---------- */
+  @media (min-width: 700px){
+    .layout{ max-width: 620px; }
+    .board-frame{ max-width: 620px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TABLERO DEL ABISMO</h1>
+</header>
+
+<div class="layout">
+
+  <div class="settings">
+    <div class="settings-icons">
+      <div class="icon-field">
+        <span class="icon-field-label">Modo de juego</span>
+        <div class="icon-group" id="modeGroup">
+          <button type="button" class="icon-btn active" data-mode="local" title="Dos jugadores" aria-label="Dos jugadores">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          </button>
+          <button type="button" class="icon-btn" data-mode="vsAI" title="Contra el ordenador" aria-label="Contra el ordenador">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+          </button>
+          <button type="button" class="icon-btn" data-mode="online" title="Online" aria-label="Jugar online contra otra persona">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="icon-field">
+        <span class="icon-field-label">Modo</span>
+        <div class="icon-group">
+          <button type="button" class="icon-btn" id="captureToggleBtn" title="Modo captura" aria-label="Modo captura (permite comer a la pieza rival)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="icon-field">
+        <span class="icon-field-label">Pieza</span>
+        <div class="icon-group" id="pieceGroup">
+          <button type="button" class="icon-btn piece-btn active" data-piece="torre" title="Torre" aria-label="Jugar con torres">♜</button>
+          <button type="button" class="icon-btn piece-btn" data-piece="dama" title="Dama" aria-label="Jugar con damas">♛</button>
+          <button type="button" class="icon-btn piece-btn" data-piece="caballo" title="Caballo" aria-label="Jugar con caballos">♞</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="onlinePanel" class="hidden">
+    <div class="online-view" id="onlineIdle">
+      <button type="button" class="action" id="onlineCreateBtn">Crear partida</button>
+      <div class="online-join">
+        <input id="onlineCodeInput" maxlength="4" placeholder="CÓDIGO" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Código de la sala">
+        <button type="button" class="action" id="onlineJoinBtn">Unirse</button>
+      </div>
+    </div>
+    <div class="online-view hidden" id="onlineWaiting">
+      <span class="online-msg">Código de la sala:</span>
+      <span class="online-code" id="onlineCode">----</span>
+      <button type="button" class="action" id="onlineInviteBtn">Invitar</button>
+      <button type="button" class="action" id="onlineCancelBtn">Cancelar</button>
+    </div>
+    <div class="online-view hidden" id="onlineConnected">
+      <button type="button" class="action" id="onlineLeaveBtn">Salir de la partida</button>
+    </div>
+    <span class="online-msg" id="onlineMsg">Crea una partida e invita a tu rival, o escribe su código para unirte.</span>
+  </div>
+
+  <div id="statusBar" class="status-bar turn-white">
+    <span class="status-dot"></span>
+    <span id="statusText">Turno: TORRE CIAN</span>
+  </div>
+
+  <div class="board-frame" id="boardFrame">
+    <div class="board-inner">
+      <div class="ranks" id="ranks"></div>
+      <div class="board-col">
+        <div class="board" id="board"></div>
+        <div class="files" id="files"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="theme-panel">
+    <div class="icon-field">
+      <span class="icon-field-label">Acciones</span>
+      <div class="icon-group">
+        <button type="button" class="icon-btn active" id="soundToggleBtn" title="Sonido" aria-label="Sonido">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+        </button>
+        <button type="button" class="icon-btn" id="resetBtn" title="Reiniciar partida" aria-label="Reiniciar partida">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.13-3.36L23 10M1 14l5.36 4.36A9 9 0 0020.49 15"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="icon-field">
+      <span class="icon-field-label">Piezas / tablero</span>
+      <div class="icon-group" id="themeGroup"></div>
+    </div>
+    <div class="icon-field">
+      <span class="icon-field-label">Modo ayuda</span>
+      <div class="icon-group">
+        <button type="button" class="icon-btn" id="helpToggleBtn" title="Modo ayuda" aria-label="Modo ayuda (marca movimientos que te dejarían sin salida)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .8 1.6V17h6.4v-.7c0-.6.3-1.2.8-1.6A7 7 0 0012 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="theme-panel" id="vsaiPanel">
+    <div class="field field-compact" id="difficultyField">
+      <label for="difficultySelect">Nivel</label>
+      <select id="difficultySelect">
+        <option value="facil">Fácil</option>
+        <option value="medio" selected>Medio</option>
+        <option value="dificil">Difícil</option>
+      </select>
+    </div>
+    <div class="icon-field" id="sideField">
+      <span class="icon-field-label">Tu bando</span>
+      <div class="icon-group" id="sideGroup">
+        <button type="button" class="side-swatch active" data-side="white" title="Cian" aria-label="Jugar con el bando cian"></button>
+        <button type="button" class="side-swatch" data-side="black" title="Magenta" aria-label="Jugar con el bando magenta"></button>
+      </div>
+    </div>
+  </div>
+
+  <details class="rules">
+    <summary title="Cómo se juega" aria-label="Cómo se juega">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.3" r="0.6" fill="currentColor" stroke="none"/></svg>
+    </summary>
+    <div class="rules-body">
+      <p><strong>Objetivo:</strong> deja al rival sin ningún movimiento legal.</p>
+      <p><strong>Tipo de pieza:</strong> elige si se juega con torres, damas o caballos — los dos jugadores usan siempre el mismo tipo. La pieza cian empieza en h1, la magenta en a8.</p>
+      <p><strong>Movimiento:</strong> la torre se mueve en línea recta (fila o columna); la dama, igual que la torre pero también en diagonal; ambas, tantas casillas como quieras. El caballo salta en L, como en el ajedrez normal.</p>
+      <p><strong>Casillas quemadas:</strong> al moverte, la casilla que dejas queda quemada para siempre — ni tú ni el rival podréis volver a pisarla. Con torre o dama, también se queman todas las casillas que atraviesas por el camino; puedes saltar por encima de una ya quemada para llegar más lejos, pero nunca terminar tu movimiento sobre ella. El caballo, al saltar, solo quema la casilla de la que sale — y como no atraviesa nada, ni los huecos ni la pieza rival le bloquean el salto.</p>
+      <p><strong>La pieza rival bloquea (torre y dama):</strong> a diferencia de un hueco quemado, no puedes saltar por encima de la pieza contraria ni aterrizar en su casilla.</p>
+      <p><strong>Modo captura (opcional):</strong> actívalo en Opciones para poder terminar tu movimiento justo sobre la pieza rival y comerla, ganando la partida al instante. Con torre sigues sin poder saltarla. No está disponible con dama: al empezar en diagonal (h1 y a8), la primera jugada sería siempre una captura automática.</p>
+      <p><strong>Turnos:</strong> empieza el bando cian. Si en tu turno no tienes ningún movimiento legal, pierdes.</p>
+      <p><strong>Modo ayuda:</strong> resalta en rojo los movimientos que te dejarían sin salida en tu siguiente turno, y también los que dejarían a tu pieza al alcance de una captura rival (con el modo captura activado).</p>
+      <p><strong>Sonido:</strong> efectos al mover, al rechazar un movimiento y al terminar la partida. Se puede silenciar en cualquier momento.</p>
+      <p><strong>Contra el ordenador:</strong> elige tu bando y la dificultad. La IA juega con una heurística de movilidad, no de forma matemáticamente perfecta.</p>
+      <p><strong>Online:</strong> pulsa el globo y "Crear partida". Aparecerá un código de 4 letras: díselo a tu rival o pulsa "Invitar" para enviarle el enlace por WhatsApp, email, etc. Quien crea la partida juega con cian y elige la pieza y el modo captura; quien se une juega con magenta.</p>
+      <p>Toca tu pieza para seleccionarla y luego toca la casilla destino.</p>
+    </div>
+  </details>
+
+</div>
+
+<div class="victory-overlay" id="victoryOverlay">
+  <div class="victory-card" id="victoryCard">
+    <div class="victory-beam"></div>
+    <h2 id="victoryTitle">TORRE CIAN GANA</h2>
+    <p id="victorySubtitle">El rival se ha quedado sin movimientos legales</p>
+    <button class="action" id="victoryReplayBtn">Jugar de nuevo</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const FILES = ['a','b','c','d','e','f','g','h'];
+
+  const THEMES = {
+    neonCian: {
+      label: 'Neón · Cian / Magenta',
+      sqLight:'#2a4079', sqDark:'#142c56', border:'#1b2333',
+      white:'#35fff0', black:'#ff3ec8',
+      whiteShadow:'0 0 6px rgba(53,255,240,0.9), 0 0 16px rgba(53,255,240,0.5)',
+      blackShadow:'0 0 6px rgba(255,62,200,0.9), 0 0 16px rgba(255,62,200,0.5)'
+    },
+    neonAmbar: {
+      label: 'Neón · Ámbar / Verde',
+      sqLight:'#2c2109', sqDark:'#0a0703', border:'#2a2210',
+      white:'#ffb23c', black:'#6dff6d',
+      whiteShadow:'0 0 6px rgba(255,178,60,0.9), 0 0 16px rgba(255,178,60,0.5)',
+      blackShadow:'0 0 6px rgba(109,255,109,0.9), 0 0 16px rgba(109,255,109,0.5)'
+    },
+    madera: {
+      label: 'Clásico · Madera',
+      sqLight:'#d9b48c', sqDark:'#7a4b2b', border:'#5c3a20',
+      white:'#f7f3ea', black:'#2b1c10',
+      whiteShadow:'0 2px 3px rgba(0,0,0,0.45)',
+      blackShadow:'0 2px 3px rgba(0,0,0,0.35)'
+    },
+    marmol: {
+      label: 'Clásico · Mármol',
+      sqLight:'#eceff3', sqDark:'#8b93a1', border:'#5a6270',
+      white:'#f8f8f8', black:'#20242c',
+      whiteShadow:'-1px -1px 0 rgba(35,38,45,0.9), 1px -1px 0 rgba(35,38,45,0.9), -1px 1px 0 rgba(35,38,45,0.9), 1px 1px 0 rgba(35,38,45,0.9), 0 2px 4px rgba(0,0,0,0.35)',
+      blackShadow:'0 2px 4px rgba(0,0,0,0.3)'
+    }
+  };
+
+  let state = {
+    white: { file: 7, rank: 1 }, // h1
+    black: { file: 0, rank: 8 }, // a8
+    turn: 'white',
+    selected: false,
+    over: false,
+    winner: null,
+    loseReason: null,
+    mode: 'local',
+    aiSide: 'black',
+    difficulty: 'medio',
+    help: false,
+    theme: 'neonCian',
+    sound: true,
+    kbFocus: null,
+    burnt: new Set(),
+    captureMode: false,
+    pieceType: 'torre'
+  };
+
+  const boardEl = document.getElementById('board');
+  const boardFrameEl = document.getElementById('boardFrame');
+  const ranksEl = document.getElementById('ranks');
+  const filesEl = document.getElementById('files');
+  const statusBar = document.getElementById('statusBar');
+  const statusText = document.getElementById('statusText');
+  const resetBtn = document.getElementById('resetBtn');
+  const modeGroup = document.getElementById('modeGroup');
+  const sideGroup = document.getElementById('sideGroup');
+  const pieceGroup = document.getElementById('pieceGroup');
+  const sideField = document.getElementById('sideField');
+  const difficultySelect = document.getElementById('difficultySelect');
+  const difficultyField = document.getElementById('difficultyField');
+  const vsaiPanel = document.getElementById('vsaiPanel');
+  const themeGroup = document.getElementById('themeGroup');
+  const helpToggleBtn = document.getElementById('helpToggleBtn');
+  const captureToggleBtn = document.getElementById('captureToggleBtn');
+  const soundToggleBtn = document.getElementById('soundToggleBtn');
+  const victoryOverlay = document.getElementById('victoryOverlay');
+  const victoryCard = document.getElementById('victoryCard');
+  const victoryTitle = document.getElementById('victoryTitle');
+  const victorySubtitle = document.getElementById('victorySubtitle');
+  const victoryReplayBtn = document.getElementById('victoryReplayBtn');
+
+  // ---------- sound ----------
+  let audioCtx = null;
+  function getAudioCtx(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playTone(freqStart, freqEnd, duration, type, gainPeak){
+    if (!state.sound) return;
+    try{
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), ctx.currentTime + duration);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(gainPeak, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration + 0.03);
+    } catch(e){ /* audio unavailable, fail silently */ }
+  }
+
+  function soundSelect(){ playTone(520, 760, 0.08, 'sine', 0.06); }
+  function soundMove(){ playTone(1100, 260, 0.16, 'sawtooth', 0.1); }
+  function soundReject(){ playTone(160, 90, 0.22, 'square', 0.11); }
+  function soundGameOver(){
+    if (!state.sound) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      setTimeout(() => playTone(freq, freq, 0.16, 'triangle', 0.09), i * 110);
+    });
+  }
+
+  // ---------- core rules ----------
+  function opponentOf(p){ return p === 'white' ? 'black' : 'white'; }
+
+  function squareKey(file, rank){ return file + '-' + rank; }
+  function isBurnt(file, rank, burnt){ return burnt.has(squareKey(file, rank)); }
+  function burnSquare(file, rank){ state.burnt.add(squareKey(file, rank)); }
+
+  const SLIDE_DIRS = {
+    torre: [[1,0],[-1,0],[0,1],[0,-1]],
+    dama: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+  };
+  const KNIGHT_OFFSETS = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+  const PIECE_GLYPHS = { torre: '♜', dama: '♛', caballo: '♞' };
+  const PIECE_LABELS = { torre: 'TORRE', dama: 'DAMA', caballo: 'CABALLO' };
+  function pieceLabel(){ return PIECE_LABELS[state.pieceType] || 'TORRE'; }
+
+  function legalMoves(pos, oppPos, burnt){
+    const moves = [];
+    const captures = state.captureMode;
+
+    if (state.pieceType === 'caballo'){
+      // a knight jumps straight to its destination — it never "passes over"
+      // burnt squares or the rival, so neither one can block it mid-flight
+      for (const [df, dr] of KNIGHT_OFFSETS){
+        const f = pos.file + df, r = pos.rank + dr;
+        if (f < 0 || f > 7 || r < 1 || r > 8) continue;
+        if (f === oppPos.file && r === oppPos.rank){
+          if (captures) moves.push({ file: f, rank: r, capture: true });
+          continue;
+        }
+        if (!isBurnt(f, r, burnt)) moves.push({ file: f, rank: r });
+      }
+      return moves;
+    }
+
+    // sliding pieces (torre / dama): scan each direction, the rival tower always
+    // stops the line — captures off means you can't reach it; captures on means
+    // landing on it wins. Burnt squares don't block; they're just not valid landings.
+    const dirs = SLIDE_DIRS[state.pieceType] || SLIDE_DIRS.torre;
+    for (const [df, dr] of dirs){
+      let f = pos.file + df, r = pos.rank + dr;
+      while (f >= 0 && f <= 7 && r >= 1 && r <= 8){
+        if (f === oppPos.file && r === oppPos.rank){
+          if (captures) moves.push({ file: f, rank: r, capture: true });
+          break;
+        }
+        if (!isBurnt(f, r, burnt)) moves.push({ file: f, rank: r });
+        f += df; r += dr;
+      }
+    }
+    return moves;
+  }
+
+  function hasAnyLegalMove(pos, oppPos, burnt){
+    return legalMoves(pos, oppPos, burnt).length > 0;
+  }
+
+  // path of squares a move burns: the origin plus every square strictly in between.
+  // A knight has no such path (it jumps) — only its origin burns.
+  // Jumping over an already-burnt square is allowed for sliding pieces, so it never blocks the path.
+  function pathSquares(from, to){
+    const squares = [{ file: from.file, rank: from.rank }];
+    if (state.pieceType === 'caballo') return squares;
+    const stepF = Math.sign(to.file - from.file);
+    const stepR = Math.sign(to.rank - from.rank);
+    let f = from.file + stepF, r = from.rank + stepR;
+    while (f !== to.file || r !== to.rank){
+      squares.push({ file: f, rank: r });
+      f += stepF; r += stepR;
+    }
+    return squares;
+  }
+
+  function applyMove(pos, target){
+    pathSquares(pos, target).forEach(sq => burnSquare(sq.file, sq.rank));
+    pos.file = target.file;
+    pos.rank = target.rank;
+  }
+
+  // pure version for AI search: returns a NEW burnt set, never touches state.burnt
+  function simulateApply(pos, target, burnt){
+    const next = new Set(burnt);
+    pathSquares(pos, target).forEach(sq => next.add(squareKey(sq.file, sq.rank)));
+    return next;
+  }
+
+  // would landing on `target` leave the mover with zero moves on their next turn?
+  // (a capturing move ends the game in the mover's favor, so it's never a trap)
+  function isDeadEnd(pos, target, oppPos, burnt){
+    if (target.capture) return false;
+    const nextBurnt = simulateApply(pos, target, burnt);
+    return legalMoves(target, oppPos, nextBurnt).length === 0;
+  }
+
+  // would landing on `target` let the rival capture us right back next turn?
+  // (only relevant with captures enabled; capturing ourselves ends the game, so never a risk)
+  function isCapturable(pos, target, oppPos, burnt){
+    if (!state.captureMode || target.capture) return false;
+    const nextBurnt = simulateApply(pos, target, burnt);
+    return legalMoves(oppPos, target, nextBurnt).some(m => m.capture);
+  }
+
+  // ---------- AI (heuristic — a perfect solver isn't feasible: burnt squares
+  // are part of the game state, so the state space is far too large to
+  // pre-compute like Torres Láser's exact solver did) ----------
+  const AI_DEPTH = { medio: 2, dificil: 4 };
+
+  // recursive minimax with alpha-beta pruning, always scored from the AI's point of view
+  function search(aiPos, humanPos, burnt, depth, aiToMove, alpha, beta){
+    const mover = aiToMove ? aiPos : humanPos;
+    const other = aiToMove ? humanPos : aiPos;
+    const moves = legalMoves(mover, other, burnt);
+
+    if (moves.length === 0){
+      // whoever's turn it is here has no move and loses
+      return aiToMove ? -1000 : 1000;
+    }
+    if (state.captureMode && moves.some(m => m.capture)){
+      // capturing ends the game outright in the mover's favor
+      return aiToMove ? 2000 : -2000;
+    }
+    if (depth === 0){
+      const aiMobility = legalMoves(aiPos, humanPos, burnt).length;
+      const humanMobility = legalMoves(humanPos, aiPos, burnt).length;
+      return aiMobility - humanMobility;
+    }
+
+    let bestScore = aiToMove ? -Infinity : Infinity;
+    for (const m of moves){
+      const nextBurnt = simulateApply(mover, m, burnt);
+      const movedPos = { file: m.file, rank: m.rank };
+      const nextAiPos = aiToMove ? movedPos : aiPos;
+      const nextHumanPos = aiToMove ? humanPos : movedPos;
+      const score = search(nextAiPos, nextHumanPos, nextBurnt, depth - 1, !aiToMove, alpha, beta);
+      if (aiToMove){
+        if (score > bestScore) bestScore = score;
+        alpha = Math.max(alpha, score);
+      } else {
+        if (score < bestScore) bestScore = score;
+        beta = Math.min(beta, score);
+      }
+      if (beta <= alpha) break;
+    }
+    return bestScore;
+  }
+
+  function aiChooseMove(pos, oppPos, side, difficulty){
+    const moves = legalMoves(pos, oppPos, state.burnt);
+    if (moves.length === 0) return null;
+
+    if (state.captureMode){
+      const captureMove = moves.find(m => m.capture);
+      if (captureMove) return captureMove; // a free win — always take it
+    }
+
+    if (difficulty === 'facil'){
+      return moves[Math.floor(Math.random() * moves.length)];
+    }
+
+    const depth = AI_DEPTH[difficulty] || 2;
+
+    // order candidates by immediate opponent mobility first — helps alpha-beta prune more
+    const ordered = moves.slice().sort((a, b) => {
+      const burntA = simulateApply(pos, a, state.burnt);
+      const burntB = simulateApply(pos, b, state.burnt);
+      return legalMoves(oppPos, a, burntA).length - legalMoves(oppPos, b, burntB).length;
+    });
+
+    let bestMoves = [];
+    let bestScore = -Infinity;
+    for (const m of ordered){
+      const nextBurnt = simulateApply(pos, m, state.burnt);
+      const nextAiPos = { file: m.file, rank: m.rank };
+      const score = search(nextAiPos, oppPos, nextBurnt, depth, false, -Infinity, Infinity);
+      if (score > bestScore){
+        bestScore = score;
+        bestMoves = [m];
+      } else if (score === bestScore){
+        bestMoves.push(m);
+      }
+    }
+    return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+  }
+
+  // ---------- rendering ----------
+  function squareEl(fileIdx, rank){
+    return boardEl.querySelector(`[data-file="${fileIdx}"][data-rank="${rank}"]`);
+  }
+
+  function applyTheme(themeKey){
+    const t = THEMES[themeKey];
+    const root = document.documentElement;
+    root.style.setProperty('--sq-light', t.sqLight);
+    root.style.setProperty('--sq-dark', t.sqDark);
+    root.style.setProperty('--board-border', t.border);
+    root.style.setProperty('--piece-white', t.white);
+    root.style.setProperty('--piece-black', t.black);
+    root.style.setProperty('--white-shadow', t.whiteShadow);
+    root.style.setProperty('--black-shadow', t.blackShadow);
+  }
+
+  function render(){
+    boardEl.querySelectorAll('.square').forEach(sq => {
+      sq.classList.remove('selected', 'legal-move', 'mover-white', 'mover-black', 'victory-square', 'kb-focus', 'burnt', 'trap', 'capturable');
+      sq.innerHTML = '';
+    });
+
+    state.burnt.forEach(key => {
+      const [f, r] = key.split('-').map(Number);
+      squareEl(f, r).classList.add('burnt');
+    });
+
+    if (state.loseReason === 'captured'){
+      // the captured piece is gone — only the winner remains on the board
+      const winnerPos = state[state.winner];
+      squareEl(winnerPos.file, winnerPos.rank).innerHTML = `<span class="piece ${state.winner}">${PIECE_GLYPHS[state.pieceType]}</span>`;
+    } else {
+      squareEl(state.white.file, state.white.rank).innerHTML = `<span class="piece white">${PIECE_GLYPHS[state.pieceType]}</span>`;
+      squareEl(state.black.file, state.black.rank).innerHTML = `<span class="piece black">${PIECE_GLYPHS[state.pieceType]}</span>`;
+    }
+
+    if (state.kbFocus){
+      squareEl(state.kbFocus.file, state.kbFocus.rank).classList.add('kb-focus');
+    }
+
+    if (state.selected){
+      const pos = state[state.turn];
+      const oppPos = state[opponentOf(state.turn)];
+      squareEl(pos.file, pos.rank).classList.add('selected');
+      legalMoves(pos, oppPos, state.burnt).forEach(m => {
+        const sq = squareEl(m.file, m.rank);
+        sq.classList.add('legal-move', state.turn === 'white' ? 'mover-white' : 'mover-black');
+        if (m.capture){
+          sq.classList.add('capturable');
+        } else if (state.help && (isDeadEnd(pos, m, oppPos, state.burnt) || isCapturable(pos, m, oppPos, state.burnt))){
+          sq.classList.add('trap');
+        }
+        const dot = document.createElement('span');
+        dot.className = 'legal-dot';
+        sq.appendChild(dot);
+      });
+    }
+
+    statusBar.classList.remove('turn-white', 'turn-black', 'game-over', 'thinking');
+    if (state.over){
+      statusBar.classList.add('game-over');
+      const winnerLabel = state.winner === 'white' ? 'CIAN' : 'MAGENTA';
+      const loserLabel = state.winner === 'white' ? 'MAGENTA' : 'CIAN';
+      const winnerColorVar = state.winner === 'white' ? 'var(--piece-white)' : 'var(--piece-black)';
+      const piece = pieceLabel();
+
+      if (state.loseReason === 'captured'){
+        statusText.textContent = `Fin de la partida: ${piece} ${winnerLabel} captura a ${piece} ${loserLabel}`;
+        victorySubtitle.textContent = `${piece} ${winnerLabel} ha capturado a ${piece} ${loserLabel}`;
+      } else {
+        statusText.textContent = `Fin de la partida: gana ${piece} ${winnerLabel}`;
+        victorySubtitle.textContent = `${piece} ${loserLabel} se ha quedado sin movimientos legales`;
+      }
+
+      const winnerPos = state[state.winner];
+      squareEl(winnerPos.file, winnerPos.rank).classList.add('victory-square');
+
+      victoryTitle.textContent = `${piece} ${winnerLabel} GANA`;
+      victoryCard.style.setProperty('--victory-color', winnerColorVar);
+    } else if (state.mode === 'vsAI' && state.turn === state.aiSide){
+      statusBar.classList.add(state.turn === 'white' ? 'turn-white' : 'turn-black', 'thinking');
+      statusText.textContent = `${pieceLabel()} ${state.turn === 'white' ? 'CIAN' : 'MAGENTA'} pensando...`;
+    } else {
+      statusBar.classList.add(state.turn === 'white' ? 'turn-white' : 'turn-black');
+      statusText.textContent = `Turno: ${pieceLabel()} ${state.turn === 'white' ? 'CIAN' : 'MAGENTA'}`;
+      if (state.mode === 'online'){
+        if (!online.conn) statusText.textContent = 'Online: esperando rival';
+        else statusText.textContent += state.turn === online.side ? ' · TU TURNO' : ' · turno del rival';
+      }
+    }
+    if (state.over && state.mode === 'online' && online.conn){
+      victoryTitle.textContent = state.winner === online.side ? '¡HAS GANADO!' : 'HAS PERDIDO';
+    }
+    victoryOverlay.classList.toggle('show', state.over);
+  }
+
+  function flashReject(fileIdx, rank){
+    const sq = squareEl(fileIdx, rank);
+    sq.classList.remove('reject', 'reject-shake');
+    void sq.offsetWidth;
+    sq.classList.add('reject', 'reject-shake');
+    setTimeout(() => sq.classList.remove('reject', 'reject-shake'), 400);
+  }
+
+  function checkGameOver(){
+    const nextPos = state[state.turn];
+    const oppPos = state[opponentOf(state.turn)];
+    if (!hasAnyLegalMove(nextPos, oppPos, state.burnt)){
+      state.over = true;
+      state.winner = opponentOf(state.turn);
+      state.loseReason = 'trapped';
+      soundGameOver();
+    }
+  }
+
+  function scheduleAIIfNeeded(){
+    if (state.over) return;
+    if (state.mode !== 'vsAI') return;
+    if (state.turn !== state.aiSide) return;
+
+    render();
+    boardEl.classList.add('thinking');
+    boardFrameEl.classList.add('thinking');
+
+    setTimeout(() => {
+      const pos = state[state.turn];
+      const oppPos = state[opponentOf(state.turn)];
+      const move = aiChooseMove(pos, oppPos, state.turn, state.difficulty);
+      boardEl.classList.remove('thinking');
+      boardFrameEl.classList.remove('thinking');
+
+      if (move){
+        applyMove(pos, move);
+        state.selected = false;
+        if (move.capture){
+          state.over = true;
+          state.winner = state.turn;
+          state.loseReason = 'captured';
+          soundGameOver();
+          render();
+          return;
+        }
+        soundMove();
+      }
+      state.selected = false;
+      state.turn = opponentOf(state.turn);
+      checkGameOver();
+      render();
+    }, 550);
+  }
+
+  // apply a validated move for the side to move (local click or remote message)
+  function commitMove(chosen){
+    applyMove(state[state.turn], chosen);
+    state.selected = false;
+    if (chosen.capture){
+      state.over = true;
+      state.winner = state.turn;
+      state.loseReason = 'captured';
+      soundGameOver();
+      render();
+      return;
+    }
+    state.turn = opponentOf(state.turn);
+    soundMove();
+    checkGameOver();
+    render();
+  }
+
+  function onSquareClick(fileIdx, rank){
+    if (state.over) return;
+    if (state.mode === 'vsAI' && state.turn === state.aiSide) return;
+    if (state.mode === 'online' && (!online.conn || state.turn !== online.side)) return;
+
+    const me = state[state.turn];
+    const opp = state[opponentOf(state.turn)];
+    const clickedOwnPiece = (fileIdx === me.file && rank === me.rank);
+
+    if (clickedOwnPiece){
+      state.selected = !state.selected;
+      if (state.selected) soundSelect();
+      render();
+      return;
+    }
+
+    if (!state.selected) return;
+
+    const moves = legalMoves(me, opp, state.burnt);
+    const chosen = moves.find(m => m.file === fileIdx && m.rank === rank);
+
+    if (chosen){
+      commitMove(chosen);
+      if (state.mode === 'online') onlineSend({ t: 'move', file: chosen.file, rank: chosen.rank });
+      scheduleAIIfNeeded();
+    } else {
+      flashReject(fileIdx, rank);
+      soundReject();
+    }
+  }
+
+  function buildBoard(){
+    for (let rank = 8; rank >= 1; rank--){
+      const label = document.createElement('span');
+      label.textContent = rank;
+      ranksEl.appendChild(label);
+
+      for (let fileIdx = 0; fileIdx <= 7; fileIdx++){
+        const sq = document.createElement('div');
+        sq.className = 'square' + ((fileIdx + rank) % 2 === 0 ? ' light' : '');
+        sq.dataset.file = fileIdx;
+        sq.dataset.rank = rank;
+        sq.addEventListener('click', () => {
+          state.kbFocus = null;
+          onSquareClick(fileIdx, rank);
+        });
+        boardEl.appendChild(sq);
+      }
+    }
+    FILES.forEach(f => {
+      const label = document.createElement('span');
+      label.textContent = f;
+      filesEl.appendChild(label);
+    });
+  }
+
+  const SOUND_ICONS = {
+    on: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 010 7.07"></path><path d="M19.07 4.93a10 10 0 010 14.14"></path>',
+    off: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>'
+  };
+
+  function buildThemeOptions(){
+    Object.entries(THEMES).forEach(([key, t]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'theme-swatch';
+      btn.dataset.theme = key;
+      btn.title = t.label;
+      btn.setAttribute('aria-label', t.label);
+      btn.style.setProperty('--sw-a', t.sqLight);
+      btn.style.setProperty('--sw-b', t.sqDark);
+      btn.addEventListener('click', () => {
+        state.theme = key;
+        applyTheme(state.theme);
+        syncThemeButtons();
+        render();
+      });
+      themeGroup.appendChild(btn);
+    });
+    syncThemeButtons();
+  }
+
+  function syncThemeButtons(){
+    themeGroup.querySelectorAll('.theme-swatch').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === state.theme);
+    });
+  }
+
+  function syncModeButtons(){
+    modeGroup.querySelectorAll('.icon-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === state.mode);
+    });
+  }
+
+  function getHumanSide(){
+    const active = sideGroup.querySelector('.side-swatch.active');
+    return active ? active.dataset.side : 'white';
+  }
+
+  function syncSideButtons(selected){
+    sideGroup.querySelectorAll('.side-swatch').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.side === selected);
+    });
+  }
+
+  function syncPieceButtons(){
+    pieceGroup.querySelectorAll('.piece-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.piece === state.pieceType);
+    });
+  }
+
+  // capturing is disabled for dama: h1/a8 sit on the same diagonal with nothing
+  // between them, so the first move would always be an automatic capture
+  function syncCaptureAvailability(){
+    const disabled = state.pieceType === 'dama';
+    captureToggleBtn.disabled = disabled;
+    if (disabled){
+      state.captureMode = false;
+      captureToggleBtn.classList.remove('active');
+      captureToggleBtn.title = 'Modo captura (no disponible con dama)';
+      captureToggleBtn.setAttribute('aria-label', 'Modo captura no disponible con dama');
+    } else {
+      captureToggleBtn.title = 'Modo captura';
+      captureToggleBtn.setAttribute('aria-label', 'Modo captura (permite comer a la pieza rival)');
+    }
+  }
+
+  function syncSoundButton(){
+    soundToggleBtn.classList.toggle('active', state.sound);
+    soundToggleBtn.querySelector('svg').innerHTML = state.sound ? SOUND_ICONS.on : SOUND_ICONS.off;
+  }
+
+  function syncSettingsVisibility(){
+    const vsAI = state.mode === 'vsAI';
+    sideField.classList.toggle('hidden', !vsAI);
+    difficultyField.classList.toggle('hidden', !vsAI);
+    vsaiPanel.classList.toggle('hidden', !vsAI);
+    onlinePanel.classList.toggle('hidden', state.mode !== 'online');
+  }
+
+  function reset(){
+    state.white = { file: 7, rank: 1 };
+    state.black = { file: 0, rank: 8 };
+    state.turn = 'white';
+    state.selected = false;
+    state.over = false;
+    state.winner = null;
+    state.loseReason = null;
+    state.kbFocus = null;
+    state.burnt = new Set();
+    render();
+    scheduleAIIfNeeded();
+  }
+
+  // ---------- online (PeerJS, direct browser-to-browser) ----------
+  const onlinePanel = document.getElementById('onlinePanel');
+  const onlineIdle = document.getElementById('onlineIdle');
+  const onlineWaiting = document.getElementById('onlineWaiting');
+  const onlineConnected = document.getElementById('onlineConnected');
+  const onlineCodeEl = document.getElementById('onlineCode');
+  const onlineCodeInput = document.getElementById('onlineCodeInput');
+  const onlineMsg = document.getElementById('onlineMsg');
+  const PEER_PREFIX = 'tableroabismo2-';
+  const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
+  const online = { peer: null, conn: null, role: null, side: null, code: null };
+
+  function newCode(){
+    let c = '';
+    for (let i = 0; i < 4; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return c;
+  }
+
+  function setOnlineMsg(text, isError){
+    onlineMsg.textContent = text;
+    onlineMsg.classList.toggle('error', !!isError);
+  }
+
+  function showOnlineView(view){
+    onlineIdle.classList.toggle('hidden', view !== 'idle');
+    onlineWaiting.classList.toggle('hidden', view !== 'waiting');
+    onlineConnected.classList.toggle('hidden', view !== 'connected');
+  }
+
+  // the guest plays with whatever the host configured
+  function syncOnlineLocks(){
+    const guestLocked = state.mode === 'online' && online.role === 'guest';
+    pieceGroup.querySelectorAll('.piece-btn').forEach(b => { b.disabled = guestLocked; });
+    if (guestLocked) captureToggleBtn.disabled = true;
+    else syncCaptureAvailability();
+  }
+
+  function onlineSend(msg){
+    if (online.conn && online.conn.open) online.conn.send(msg);
+  }
+
+  function sendConfig(){
+    onlineSend({ t: 'config', pieceType: state.pieceType, captureMode: state.captureMode });
+  }
+
+  function onlineLeave(silent){
+    if (online.conn){ try { online.conn.close(); } catch(e){} }
+    if (online.peer){ try { online.peer.destroy(); } catch(e){} }
+    online.peer = null; online.conn = null; online.role = null; online.side = null; online.code = null;
+    showOnlineView('idle');
+    if (!silent) setOnlineMsg('Crea una partida e invita a tu rival, o escribe su código para unirte.');
+    syncOnlineLocks();
+    render();
+  }
+
+  function attachConn(conn){
+    online.conn = conn;
+    conn.on('open', () => {
+      showOnlineView('connected');
+      const color = online.side === 'white' ? 'CIAN' : 'MAGENTA';
+      setOnlineMsg(`Conectado · sala ${online.code} · juegas con ${color}`);
+      syncOnlineLocks();
+      reset();
+      if (online.role === 'host') sendConfig();
+      soundSelect();
+    });
+    conn.on('data', onOnlineData);
+    conn.on('close', () => {
+      if (online.conn !== conn) return;
+      online.conn = null;
+      setOnlineMsg('El rival se ha desconectado.', true);
+      if (online.role === 'host' && online.peer && !online.peer.destroyed){
+        // keep the room open so the rival can come back with the same code
+        showOnlineView('waiting');
+        setOnlineMsg('El rival se ha desconectado. Puede volver a entrar con el mismo código.', true);
+      }
+      render();
+    });
+  }
+
+  function onOnlineData(msg){
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.t === 'config' && online.role === 'guest'){
+      state.pieceType = PIECE_GLYPHS[msg.pieceType] ? msg.pieceType : 'torre';
+      state.captureMode = !!msg.captureMode && state.pieceType !== 'dama';
+      syncPieceButtons();
+      captureToggleBtn.classList.toggle('active', state.captureMode);
+      syncOnlineLocks();
+      reset();
+    } else if (msg.t === 'move'){
+      if (state.over || state.turn === online.side) return;
+      const moves = legalMoves(state[state.turn], state[opponentOf(state.turn)], state.burnt);
+      const chosen = moves.find(m => m.file === msg.file && m.rank === msg.rank);
+      if (chosen) commitMove(chosen);
+    } else if (msg.t === 'reset'){
+      reset();
+    }
+  }
+
+  function onlineCreate(attempt){
+    attempt = attempt || 0;
+    if (typeof Peer === 'undefined'){ setOnlineMsg('No se pudo cargar el módulo online. Revisa la conexión a internet.', true); return; }
+    onlineLeave(true);
+    online.role = 'host'; online.side = 'white'; online.code = newCode();
+    setOnlineMsg('Creando sala…');
+    const peer = new Peer(PEER_PREFIX + online.code);
+    online.peer = peer;
+    peer.on('open', () => {
+      onlineCodeEl.textContent = online.code;
+      showOnlineView('waiting');
+      setOnlineMsg('Esperando rival… Pásale el código o pulsa "Invitar".');
+      render();
+    });
+    peer.on('connection', (conn) => {
+      if (online.conn && online.conn.open){ conn.on('open', () => conn.close()); return; } // room full
+      attachConn(conn);
+    });
+    peer.on('error', (err) => {
+      if (err.type === 'unavailable-id' && attempt < 3){ onlineCreate(attempt + 1); return; }
+      setOnlineMsg('Error de conexión (' + err.type + '). Inténtalo de nuevo.', true);
+    });
+  }
+
+  function onlineJoin(code){
+    code = (code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 4){ setOnlineMsg('El código tiene 4 caracteres.', true); return; }
+    if (typeof Peer === 'undefined'){ setOnlineMsg('No se pudo cargar el módulo online. Revisa la conexión a internet.', true); return; }
+    onlineLeave(true);
+    online.role = 'guest'; online.side = 'black'; online.code = code;
+    setOnlineMsg('Conectando con la sala ' + code + '…');
+    const peer = new Peer();
+    online.peer = peer;
+    peer.on('open', () => {
+      attachConn(peer.connect(PEER_PREFIX + code, { reliable: true }));
+    });
+    peer.on('error', (err) => {
+      if (err.type === 'peer-unavailable') setOnlineMsg('No existe ninguna sala con el código ' + code + '.', true);
+      else setOnlineMsg('Error de conexión (' + err.type + '). Inténtalo de nuevo.', true);
+      online.role = null; online.side = null;
+      syncOnlineLocks();
+    });
+  }
+
+  function inviteLink(){
+    return location.origin + location.pathname + '?sala=' + online.code;
+  }
+
+  document.getElementById('onlineCreateBtn').addEventListener('click', () => onlineCreate());
+  document.getElementById('onlineJoinBtn').addEventListener('click', () => onlineJoin(onlineCodeInput.value));
+  onlineCodeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') onlineJoin(onlineCodeInput.value); });
+  document.getElementById('onlineCancelBtn').addEventListener('click', () => onlineLeave());
+  document.getElementById('onlineLeaveBtn').addEventListener('click', () => onlineLeave());
+  document.getElementById('onlineInviteBtn').addEventListener('click', async () => {
+    const url = inviteLink();
+    const text = '¿Una partida al Tablero del Abismo? Entra aquí:';
+    if (navigator.share){
+      try { await navigator.share({ title: 'Tablero del Abismo', text, url }); return; }
+      catch(e){ if (e && e.name === 'AbortError') return; }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setOnlineMsg('Enlace copiado. Pégalo en WhatsApp, email…');
+    } catch(e){
+      setOnlineMsg('Enlace: ' + url);
+    }
+  });
+
+  // reset that the rival also sees
+  function requestReset(){
+    reset();
+    if (state.mode === 'online' && online.conn){
+      if (online.role === 'host') sendConfig(); // config already resets the guest
+      else onlineSend({ t: 'reset' });
+    }
+  }
+
+  modeGroup.querySelectorAll('.icon-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.mode === state.mode && state.mode === 'online') return;
+      if (state.mode === 'online' && btn.dataset.mode !== 'online') onlineLeave();
+      state.mode = btn.dataset.mode;
+      syncModeButtons();
+      syncSettingsVisibility();
+      syncOnlineLocks();
+      reset();
+    });
+  });
+
+  sideGroup.querySelectorAll('.side-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      syncSideButtons(btn.dataset.side);
+      state.aiSide = opponentOf(btn.dataset.side);
+      reset();
+    });
+  });
+
+  pieceGroup.querySelectorAll('.piece-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.pieceType = btn.dataset.piece;
+      syncPieceButtons();
+      syncCaptureAvailability();
+      requestReset();
+    });
+  });
+
+  difficultySelect.addEventListener('change', () => {
+    state.difficulty = difficultySelect.value;
+    reset();
+  });
+
+  helpToggleBtn.addEventListener('click', () => {
+    state.help = !state.help;
+    helpToggleBtn.classList.toggle('active', state.help);
+    render();
+  });
+
+  captureToggleBtn.addEventListener('click', () => {
+    state.captureMode = !state.captureMode;
+    captureToggleBtn.classList.toggle('active', state.captureMode);
+    requestReset();
+  });
+
+  soundToggleBtn.addEventListener('click', () => {
+    state.sound = !state.sound;
+    if (state.sound) getAudioCtx();
+    syncSoundButton();
+  });
+
+  resetBtn.addEventListener('click', requestReset);
+  victoryReplayBtn.addEventListener('click', requestReset);
+
+  function moveKbFocus(deltaFile, deltaRank){
+    if (!state.kbFocus){
+      const pos = state[state.turn];
+      state.kbFocus = { file: pos.file, rank: pos.rank };
+    } else {
+      state.kbFocus = {
+        file: Math.min(7, Math.max(0, state.kbFocus.file + deltaFile)),
+        rank: Math.min(8, Math.max(1, state.kbFocus.rank + deltaRank))
+      };
+    }
+    render();
+  }
+
+  boardEl.setAttribute('tabindex', '0');
+  boardEl.setAttribute('role', 'group');
+  boardEl.setAttribute('aria-label', 'Tablero. Usa las flechas para mover el cursor y Intro para seleccionar o mover.');
+  boardEl.addEventListener('keydown', (e) => {
+    switch (e.key){
+      case 'ArrowUp': e.preventDefault(); moveKbFocus(0, 1); break;
+      case 'ArrowDown': e.preventDefault(); moveKbFocus(0, -1); break;
+      case 'ArrowLeft': e.preventDefault(); moveKbFocus(-1, 0); break;
+      case 'ArrowRight': e.preventDefault(); moveKbFocus(1, 0); break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (state.kbFocus) onSquareClick(state.kbFocus.file, state.kbFocus.rank);
+        break;
+    }
+  });
+
+  buildBoard();
+  buildThemeOptions();
+  applyTheme(state.theme);
+  state.aiSide = opponentOf(getHumanSide());
+  syncSettingsVisibility();
+  syncModeButtons();
+  syncPieceButtons();
+  syncCaptureAvailability();
+  syncSoundButton();
+  render();
+  scheduleAIIfNeeded();
+
+  // invitation link: ?sala=CODE jumps straight into the room
+  const salaParam = new URLSearchParams(location.search).get('sala');
+  if (salaParam){
+    state.mode = 'online';
+    syncModeButtons();
+    syncSettingsVisibility();
+    onlineCodeInput.value = salaParam.toUpperCase();
+    onlineJoin(salaParam);
+    render();
+  }
+})();
+</script>
+
+</body>
+</html>
